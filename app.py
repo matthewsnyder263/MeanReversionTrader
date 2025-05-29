@@ -92,8 +92,10 @@ sort_by = st.sidebar.selectbox(
     help="How to sort the results table"
 )
 
-# Run strategy button
-run_strategy = st.sidebar.button("🚀 Run Strategy", type="primary")
+# Run strategy button - make it more prominent
+st.sidebar.markdown("---")
+st.sidebar.markdown("### Ready to Test?")
+run_strategy = st.sidebar.button("🚀 Run Strategy", type="primary", use_container_width=True)
 
 # Main content area
 if run_strategy:
