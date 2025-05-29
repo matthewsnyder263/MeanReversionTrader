@@ -7,6 +7,7 @@ import numpy as np
 from datetime import datetime, timedelta
 from strategy import MeanReversionStrategy
 from utils import calculate_rsi, format_percentage, validate_ticker
+from database import init_database, save_backtest_results, get_backtest_history, get_backtest_details, get_ticker_statistics
 
 # Page configuration
 st.set_page_config(
@@ -22,11 +23,19 @@ This app backtests a mean reversion strategy that buys after consecutive red day
 and sells at a specified gain/loss percentage.
 """)
 
+# Initialize database
+try:
+    init_database()
+except Exception as e:
+    st.error(f"Database initialization error: {str(e)}")
+
 # Initialize session state
 if 'results_data' not in st.session_state:
     st.session_state.results_data = None
 if 'chart_data' not in st.session_state:
     st.session_state.chart_data = {}
+if 'all_trades' not in st.session_state:
+    st.session_state.all_trades = {}
 
 # Sidebar for strategy parameters
 st.sidebar.header("Strategy Parameters")
@@ -121,6 +130,7 @@ if run_strategy:
             
             results = []
             chart_data = {}
+            all_trades = {}
             
             for i, ticker in enumerate(tickers):
                 status_text.text(f"Processing {ticker}...")
@@ -160,12 +170,13 @@ if run_strategy:
                             'Worst Trade (%)': min(returns)
                         })
                         
-                        # Store chart data
+                        # Store chart data and trades
                         chart_data[ticker] = {
                             'data': data,
                             'trades': trades,
                             'signals': signals
                         }
+                        all_trades[ticker] = trades
                     
                 except Exception as e:
                     st.warning(f"⚠️ Error processing {ticker}: {str(e)}")
@@ -177,8 +188,28 @@ if run_strategy:
             
             if results:
                 # Store results in session state
-                st.session_state.results_data = pd.DataFrame(results)
+                results_df = pd.DataFrame(results)
+                st.session_state.results_data = results_df
                 st.session_state.chart_data = chart_data
+                st.session_state.all_trades = all_trades
+                
+                # Save to database
+                try:
+                    strategy_params = {
+                        'rsi_threshold': rsi_threshold,
+                        'exit_percentage': exit_percentage / 100,
+                        'red_days': red_days,
+                        'start_date': start_date,
+                        'end_date': end_date
+                    }
+                    
+                    backtest_id = save_backtest_results(
+                        strategy_params, tickers, results_df, all_trades, chart_data
+                    )
+                    st.session_state.last_backtest_id = backtest_id
+                    
+                except Exception as e:
+                    st.warning(f"Results saved locally but database save failed: {str(e)}")
                 
                 st.success(f"✅ Strategy completed! Processed {len(results)} tickers successfully.")
             else:
