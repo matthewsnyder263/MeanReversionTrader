@@ -145,7 +145,7 @@ if run_strategy:
                     # Download data
                     data = yf.download(ticker, start=start_date, end=end_date, progress=False)
                     
-                    if data.empty:
+                    if data is None or data.shape[0] == 0:
                         st.warning(f"⚠️ No data available for {ticker}")
                         continue
                     

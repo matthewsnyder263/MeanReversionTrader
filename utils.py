@@ -52,7 +52,7 @@ def validate_ticker(ticker):
         if not info or 'regularMarketPrice' not in info:
             # Try to download a small amount of recent data
             data = yf.download(ticker, period="5d", progress=False)
-            return not data.empty
+            return data is not None and data.shape[0] > 0
         
         return True
     
