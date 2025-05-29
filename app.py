@@ -402,6 +402,24 @@ if st.session_state.results_data is not None:
                     hide_index=True
                 )
 
+# Database History Section
+st.markdown("---")
+st.header("📚 Backtest History")
+
+try:
+    history_df = get_backtest_history(limit=10)
+    if not history_df.empty:
+        st.subheader("Recent Backtests")
+        st.dataframe(
+            history_df,
+            use_container_width=True,
+            hide_index=True
+        )
+    else:
+        st.info("No backtest history available yet. Run your first strategy above!")
+except Exception as e:
+    st.info("Database history not available - results will be saved locally only.")
+
 # Footer
 st.markdown("---")
 st.markdown("""
