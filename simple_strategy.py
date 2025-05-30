@@ -10,29 +10,25 @@ def calculate_simple_rsi(prices, period=14):
     gains = np.where(deltas > 0, deltas, 0)
     losses = np.where(deltas < 0, -deltas, 0)
     
-    # Simple moving average instead of EMA
-    avg_gains = []
-    avg_losses = []
+    # Initialize RSI array with correct length
+    rsi_values = [np.nan] * len(prices)
     
-    for i in range(len(gains)):
-        if i < period - 1:
-            avg_gains.append(np.nan)
-            avg_losses.append(np.nan)
+    # Calculate RSI starting from period+1 index
+    for i in range(period, len(prices)):
+        # Get gains and losses for the period
+        period_gains = gains[i-period:i]
+        period_losses = losses[i-period:i]
+        
+        avg_gain = np.mean(period_gains) if len(period_gains) > 0 else 0
+        avg_loss = np.mean(period_losses) if len(period_losses) > 0 else 0
+        
+        if avg_loss == 0:
+            rsi_values[i] = 100
         else:
-            avg_gains.append(np.mean(gains[i-period+1:i+1]))
-            avg_losses.append(np.mean(losses[i-period+1:i+1]))
+            rs = avg_gain / avg_loss
+            rsi_values[i] = 100 - (100 / (1 + rs))
     
-    rsi_values = []
-    for i in range(len(avg_gains)):
-        if np.isnan(avg_gains[i]) or avg_losses[i] == 0:
-            rsi_values.append(np.nan)
-        else:
-            rs = avg_gains[i] / avg_losses[i]
-            rsi = 100 - (100 / (1 + rs))
-            rsi_values.append(rsi)
-    
-    # Pad the first value
-    return [np.nan] + rsi_values
+    return rsi_values
 
 def simple_backtest(data, rsi_threshold=30, exit_percentage=0.05, red_days=2):
     """Simple backtesting function without complex pandas operations"""
