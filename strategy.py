@@ -42,7 +42,8 @@ class MeanReversionStrategy:
         consecutive_red.iloc[0] = 0
         
         for i in range(1, len(data)):
-            if is_red.iloc[i]:
+            # Use .iloc to avoid the ambiguous Series boolean error
+            if pd.notna(is_red.iloc[i]) and is_red.iloc[i]:
                 consecutive_red.iloc[i] = consecutive_red.iloc[i-1] + 1
             else:
                 consecutive_red.iloc[i] = 0
@@ -65,8 +66,12 @@ class MeanReversionStrategy:
         # Identify consecutive red days
         consecutive_red = self.identify_red_days(data)
         
-        # Generate buy signals
-        buy_signal = (consecutive_red >= self.red_days) & (rsi < self.rsi_threshold)
+        # Generate buy signals - handle NaN values properly
+        buy_signal = pd.Series(False, index=data.index)
+        for i in range(len(data)):
+            if (pd.notna(consecutive_red.iloc[i]) and consecutive_red.iloc[i] >= self.red_days and 
+                pd.notna(rsi.iloc[i]) and rsi.iloc[i] < self.rsi_threshold):
+                buy_signal.iloc[i] = True
         
         # Add signals to data
         signals_df = data.copy()
