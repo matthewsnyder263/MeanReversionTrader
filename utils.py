@@ -44,17 +44,18 @@ def validate_ticker(ticker):
         bool: True if ticker is valid, False otherwise
     """
     try:
-        # Try to get basic info about the ticker
-        stock = yf.Ticker(ticker)
-        info = stock.info
+        # Try to download a small amount of recent data
+        data = yf.download(ticker, period="5d", progress=False)
         
-        # Check if we got valid info
-        if not info or 'regularMarketPrice' not in info:
-            # Try to download a small amount of recent data
-            data = yf.download(ticker, period="5d", progress=False)
-            return data is not None and data.shape[0] > 0
+        # Check if data exists and has content
+        if data is None:
+            return False
         
-        return True
+        # Handle both single and multi-level column DataFrames
+        if hasattr(data, 'shape'):
+            return data.shape[0] > 0
+        else:
+            return len(data) > 0
     
     except Exception:
         return False

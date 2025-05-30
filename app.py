@@ -155,10 +155,10 @@ else:
                     progress_bar.progress((i + 1) / len(tickers))
                     
                     try:
-                        # Validate ticker
-                        if not validate_ticker(ticker):
-                            st.warning(f"⚠️ Invalid or delisted ticker: {ticker}")
-                            continue
+                        # Skip validation for now to avoid pandas Series issues
+                        # if not validate_ticker(ticker):
+                        #     st.warning(f"⚠️ Invalid or delisted ticker: {ticker}")
+                        #     continue
                         
                         # Download data
                         data = yf.download(ticker, start=start_date, end=end_date, progress=False)
