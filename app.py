@@ -167,6 +167,10 @@ else:
                             st.warning(f"⚠️ No data available for {ticker}")
                             continue
                         
+                        # Fix multi-level column structure from yfinance
+                        if isinstance(data.columns, pd.MultiIndex):
+                            data.columns = data.columns.droplevel(1)  # Remove ticker level, keep price level
+                        
                         # Run backtest
                         trades, signals = strategy.backtest(data, ticker)
                         
