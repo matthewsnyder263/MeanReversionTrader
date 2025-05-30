@@ -34,21 +34,19 @@ class MeanReversionStrategy:
         Returns:
             pd.Series: Number of consecutive red days for each date
         """
-        # A red day is when close < previous close
-        is_red = data['Close'] < data['Close'].shift(1)
+        # Calculate consecutive red days manually to avoid pandas boolean issues
+        consecutive_red = []
+        close_prices = data['Close'].values
         
-        # Calculate consecutive red days
-        consecutive_red = pd.Series(index=data.index, dtype=int)
-        consecutive_red.iloc[0] = 0
+        consecutive_red.append(0)  # First day has 0 consecutive red days
         
-        for i in range(1, len(data)):
-            # Use .iloc to avoid the ambiguous Series boolean error
-            if pd.notna(is_red.iloc[i]) and is_red.iloc[i]:
-                consecutive_red.iloc[i] = consecutive_red.iloc[i-1] + 1
+        for i in range(1, len(close_prices)):
+            if close_prices[i] < close_prices[i-1]:  # Red day
+                consecutive_red.append(consecutive_red[i-1] + 1)
             else:
-                consecutive_red.iloc[i] = 0
+                consecutive_red.append(0)
         
-        return consecutive_red
+        return pd.Series(consecutive_red, index=data.index)
     
     def generate_signals(self, data):
         """
@@ -66,12 +64,19 @@ class MeanReversionStrategy:
         # Identify consecutive red days
         consecutive_red = self.identify_red_days(data)
         
-        # Generate buy signals - handle NaN values properly
-        buy_signal = pd.Series(False, index=data.index)
+        # Generate buy signals using numpy arrays to avoid pandas boolean issues
+        buy_signal = []
+        rsi_values = rsi.values
+        consecutive_red_values = consecutive_red.values
+        
         for i in range(len(data)):
-            if (pd.notna(consecutive_red.iloc[i]) and consecutive_red.iloc[i] >= self.red_days and 
-                pd.notna(rsi.iloc[i]) and rsi.iloc[i] < self.rsi_threshold):
-                buy_signal.iloc[i] = True
+            signal = False
+            if (not np.isnan(consecutive_red_values[i]) and consecutive_red_values[i] >= self.red_days and 
+                not np.isnan(rsi_values[i]) and rsi_values[i] < self.rsi_threshold):
+                signal = True
+            buy_signal.append(signal)
+        
+        buy_signal = pd.Series(buy_signal, index=data.index)
         
         # Add signals to data
         signals_df = data.copy()
