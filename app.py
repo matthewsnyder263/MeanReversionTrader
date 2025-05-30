@@ -9,6 +9,8 @@ from simple_strategy import SimpleStrategy
 from utils import calculate_rsi, format_percentage, validate_ticker
 from database import init_database, save_backtest_results, get_backtest_history, get_backtest_details, get_ticker_statistics
 from strategy_playground import render_strategy_playground
+from notifications import render_notification_settings, check_live_signals, format_trading_signal
+import time
 
 # Page configuration
 st.set_page_config(
@@ -40,10 +42,12 @@ if 'red_days' not in st.session_state:
     st.session_state.red_days = 2
 
 # Navigation
-page = st.sidebar.radio("Navigation", ["🏠 Backtester", "🎮 Strategy Playground"], index=0)
+page = st.sidebar.radio("Navigation", ["🏠 Backtester", "🎮 Strategy Playground", "🚨 Live Signals"], index=0)
 
 if page == "🎮 Strategy Playground":
     render_strategy_playground()
+elif page == "🚨 Live Signals":
+    render_live_signals_page()
 else:
     # Title and description
     st.title("📈 Mean Reversion Strategy Backtester")
@@ -452,3 +456,144 @@ else:
         rsi_threshold=rsi_threshold if 'rsi_threshold' in locals() else 30,
         exit_percentage=exit_percentage if 'exit_percentage' in locals() else 5.0
     ))
+
+def render_live_signals_page():
+    """Render the live signals monitoring page"""
+    st.title("🚨 Live Trading Signals")
+    st.markdown("""
+    Monitor your watchlist for real-time trading signals based on your strategy parameters.
+    Set up notifications to get alerts via SMS or email when signals are detected.
+    """)
+    
+    # Get notification settings from sidebar
+    notification_settings = render_notification_settings()
+    
+    # Strategy parameters for live monitoring
+    st.header("Strategy Parameters for Live Monitoring")
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        live_rsi_threshold = st.slider("RSI Threshold", 10, 50, st.session_state.rsi_threshold)
+    with col2:
+        live_exit_percentage = st.slider("Exit %", 1.0, 10.0, st.session_state.exit_percentage, step=0.5)
+    with col3:
+        live_red_days = st.slider("Red Days", 1, 5, st.session_state.red_days)
+    
+    strategy_params = {
+        'rsi_threshold': live_rsi_threshold,
+        'exit_percentage': live_exit_percentage / 100,
+        'red_days': live_red_days
+    }
+    
+    # Manual signal check
+    if st.button("🔍 Check Signals Now", type="primary"):
+        if not notification_settings['watchlist']:
+            st.warning("Please add tickers to your watchlist in the sidebar")
+        else:
+            with st.spinner("Checking for trading signals..."):
+                signals = check_live_signals(
+                    notification_settings['watchlist'], 
+                    strategy_params, 
+                    notification_settings
+                )
+                
+                if signals:
+                    st.success(f"Found {len(signals)} trading signal(s)!")
+                    
+                    for signal in signals:
+                        st.info(f"""
+                        **{signal['ticker']} - {signal['signal_type']} Signal**
+                        - Price: ${signal['price']:.2f}
+                        - RSI: {signal['rsi']:.1f}
+                        - Red Days: {signal['red_days']}
+                        - Time: {signal['timestamp'].strftime('%Y-%m-%d %H:%M:%S')}
+                        """)
+                else:
+                    st.info("No trading signals found at this time")
+    
+    # Current watchlist status
+    if notification_settings['watchlist']:
+        st.header("📊 Current Watchlist Status")
+        
+        # Create a quick overview of current prices and RSI
+        overview_data = []
+        for ticker in notification_settings['watchlist']:
+            try:
+                # Get recent data
+                data = yf.download(ticker, period="30d", progress=False)
+                if isinstance(data.columns, pd.MultiIndex):
+                    data.columns = data.columns.droplevel(1)
+                
+                if len(data) > 14:
+                    closes = data['Close'].values
+                    latest_price = closes[-1]
+                    
+                    from simple_strategy import calculate_simple_rsi
+                    rsi_values = calculate_simple_rsi(closes)
+                    latest_rsi = rsi_values[-1]
+                    
+                    # Calculate consecutive red days
+                    consecutive_red = 0
+                    for i in range(len(closes)-1, 0, -1):
+                        if closes[i] < closes[i-1]:
+                            consecutive_red += 1
+                        else:
+                            break
+                    
+                    # Check if signal conditions are met
+                    signal_active = (consecutive_red >= live_red_days and 
+                                   latest_rsi < live_rsi_threshold)
+                    
+                    overview_data.append({
+                        'Ticker': ticker,
+                        'Price': f"${latest_price:.2f}",
+                        'RSI': f"{latest_rsi:.1f}" if not pd.isna(latest_rsi) else "N/A",
+                        'Red Days': consecutive_red,
+                        'Signal': "🟢 BUY" if signal_active else "⚪ None"
+                    })
+            except:
+                overview_data.append({
+                    'Ticker': ticker,
+                    'Price': "Error",
+                    'RSI': "Error",
+                    'Red Days': "Error",
+                    'Signal': "Error"
+                })
+        
+        if overview_data:
+            df_overview = pd.DataFrame(overview_data)
+            st.dataframe(df_overview, use_container_width=True)
+    
+    # Instructions
+    st.header("📖 How to Set Up Notifications")
+    
+    with st.expander("SMS Notifications Setup"):
+        st.markdown("""
+        To receive SMS notifications, you need Twilio credentials:
+        1. Sign up for a Twilio account at twilio.com
+        2. Get your Account SID, Auth Token, and Phone Number
+        3. The system administrator needs to add these to the environment variables
+        4. Enter your phone number in the sidebar (include country code, e.g., +1234567890)
+        """)
+    
+    with st.expander("Email Notifications Setup"):
+        st.markdown("""
+        To receive email notifications using Gmail:
+        1. Use a Gmail account as the sender
+        2. Enable 2-factor authentication on the Gmail account
+        3. Generate an App Password (not your regular password)
+        4. Enter your email address and the sender's Gmail credentials in the sidebar
+        
+        **Security Note:** Use a dedicated Gmail account for sending notifications.
+        """)
+    
+    with st.expander("Strategy Parameters"):
+        st.markdown(f"""
+        Current monitoring parameters:
+        - **RSI Threshold:** {live_rsi_threshold} (Buy when RSI is below this value)
+        - **Red Days Required:** {live_red_days} (Number of consecutive down days)
+        - **Exit Percentage:** {live_exit_percentage}% (Target gain/loss for exit)
+        
+        Signals are generated when a stock has {live_red_days} or more consecutive red days 
+        AND the RSI is below {live_rsi_threshold}.
+        """)
