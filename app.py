@@ -5,7 +5,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import numpy as np
 from datetime import datetime, timedelta
-from strategy import MeanReversionStrategy
+from simple_strategy import SimpleStrategy
 from utils import calculate_rsi, format_percentage, validate_ticker
 from database import init_database, save_backtest_results, get_backtest_history, get_backtest_details, get_ticker_statistics
 from strategy_playground import render_strategy_playground
@@ -136,7 +136,7 @@ else:
                 st.error("Please enter at least one ticker symbol!")
             else:
                 # Initialize strategy
-                strategy = MeanReversionStrategy(
+                strategy = SimpleStrategy(
                     rsi_threshold=rsi_threshold,
                     exit_percentage=exit_percentage / 100,  # Convert to decimal
                     red_days=red_days
