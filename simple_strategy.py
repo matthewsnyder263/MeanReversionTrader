@@ -1,6 +1,10 @@
 import pandas as pd
 import numpy as np
+import warnings
 from datetime import datetime
+
+# Suppress numpy warnings
+warnings.filterwarnings('ignore', category=RuntimeWarning)
 
 def calculate_simple_rsi(prices, period=14):
     """Simple RSI calculation without pandas boolean operations"""
@@ -53,6 +57,7 @@ def simple_backtest(data, rsi_threshold=30, exit_percentage=0.05, red_days=2):
     # Find trading signals
     trades = []
     position = None
+    buy_signals = 0
     
     for i in range(len(dates)):
         current_date = dates[i]
@@ -67,6 +72,7 @@ def simple_backtest(data, rsi_threshold=30, exit_percentage=0.05, red_days=2):
         # Check for buy signal
         if position is None:
             if current_red_days >= red_days and current_rsi < rsi_threshold:
+                buy_signals += 1
                 position = {
                     'buy_date': current_date,
                     'buy_price': current_price,
@@ -94,6 +100,10 @@ def simple_backtest(data, rsi_threshold=30, exit_percentage=0.05, red_days=2):
                 
                 trades.append(trade)
                 position = None
+    
+    # Debug info
+    print(f"Debug: Found {buy_signals} buy signals, {len(trades)} completed trades")
+    print(f"Debug: RSI threshold: {rsi_threshold}, Red days: {red_days}, Exit %: {exit_percentage}")
     
     return trades
 
