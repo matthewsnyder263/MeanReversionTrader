@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from strategy import MeanReversionStrategy
 from utils import calculate_rsi, format_percentage, validate_ticker
 from database import init_database, save_backtest_results, get_backtest_history, get_backtest_details, get_ticker_statistics
+from strategy_playground import render_strategy_playground
 
 # Page configuration
 st.set_page_config(
@@ -16,98 +17,115 @@ st.set_page_config(
     layout="wide"
 )
 
-# Title and description
-st.title("📈 Mean Reversion Strategy Backtester")
-st.markdown("""
-This app backtests a mean reversion strategy that buys after consecutive red days when RSI is below a threshold,
-and sells at a specified gain/loss percentage.
-""")
+# Navigation
+page = st.sidebar.radio("Navigation", ["🏠 Backtester", "🎮 Strategy Playground"], index=0)
 
-# Initialize database
-try:
-    init_database()
-except Exception as e:
-    st.error(f"Database initialization error: {str(e)}")
+if page == "🎮 Strategy Playground":
+    render_strategy_playground()
+else:
+    # Title and description
+    st.title("📈 Mean Reversion Strategy Backtester")
+    st.markdown("""
+    This app backtests a mean reversion strategy that buys after consecutive red days when RSI is below a threshold,
+    and sells at a specified gain/loss percentage.
+    """)
 
-# Initialize session state
-if 'results_data' not in st.session_state:
-    st.session_state.results_data = None
-if 'chart_data' not in st.session_state:
-    st.session_state.chart_data = {}
-if 'all_trades' not in st.session_state:
-    st.session_state.all_trades = {}
+    # Initialize database
+    try:
+        init_database()
+    except Exception as e:
+        st.error(f"Database initialization error: {str(e)}")
 
-# Sidebar for strategy parameters
-st.sidebar.header("Strategy Parameters")
+    # Initialize session state
+    if 'results_data' not in st.session_state:
+        st.session_state.results_data = None
+    if 'chart_data' not in st.session_state:
+        st.session_state.chart_data = {}
+    if 'all_trades' not in st.session_state:
+        st.session_state.all_trades = {}
 
-# RSI Threshold
-rsi_threshold = st.sidebar.slider(
-    "RSI Threshold", 
-    min_value=10, 
-    max_value=50, 
-    value=30, 
-    help="Buy when RSI is below this value"
-)
+    # Store current parameters in session state for playground
+    if 'rsi_threshold' not in st.session_state:
+        st.session_state.rsi_threshold = 30
+    if 'exit_percentage' not in st.session_state:
+        st.session_state.exit_percentage = 5.0
+    if 'red_days' not in st.session_state:
+        st.session_state.red_days = 2
 
-# Gain/Loss Exit Percentage
-exit_percentage = st.sidebar.slider(
-    "Exit Gain/Loss %", 
-    min_value=1.0, 
-    max_value=10.0, 
-    value=5.0, 
-    step=0.5,
-    help="Sell when stock moves +/- this percentage from buy price"
-)
+    # Sidebar for strategy parameters
+    st.sidebar.header("Strategy Parameters")
 
-# Red Days Before Buy
-red_days = st.sidebar.slider(
-    "Red Days Before Buy", 
-    min_value=1, 
-    max_value=5, 
-    value=2,
-    help="Number of consecutive red days before triggering a buy signal"
-)
-
-# Date range selection
-st.sidebar.header("Backtest Period")
-col1, col2 = st.sidebar.columns(2)
-
-with col1:
-    start_date = st.date_input(
-        "Start Date",
-        value=datetime.now() - timedelta(days=365),
-        max_value=datetime.now()
+    # RSI Threshold
+    rsi_threshold = st.sidebar.slider(
+        "RSI Threshold", 
+        min_value=10, 
+        max_value=50, 
+        value=st.session_state.rsi_threshold, 
+        help="Buy when RSI is below this value"
     )
+    st.session_state.rsi_threshold = rsi_threshold
 
-with col2:
-    end_date = st.date_input(
-        "End Date",
-        value=datetime.now(),
-        max_value=datetime.now()
+    # Gain/Loss Exit Percentage
+    exit_percentage = st.sidebar.slider(
+        "Exit Gain/Loss %", 
+        min_value=1.0, 
+        max_value=10.0, 
+        value=st.session_state.exit_percentage, 
+        step=0.5,
+        help="Sell when stock moves +/- this percentage from buy price"
     )
+    st.session_state.exit_percentage = exit_percentage
 
-# Watchlist input
-st.sidebar.header("Stock Selection")
-watchlist_input = st.sidebar.text_area(
+    # Red Days Before Buy
+    red_days = st.sidebar.slider(
+        "Red Days Before Buy", 
+        min_value=1, 
+        max_value=5, 
+        value=st.session_state.red_days,
+        help="Number of consecutive red days before triggering a buy signal"
+    )
+    st.session_state.red_days = red_days
+
+    # Date range selection
+    st.sidebar.header("Backtest Period")
+    col1, col2 = st.sidebar.columns(2)
+
+    with col1:
+        start_date = st.date_input(
+            "Start Date",
+            value=datetime.now() - timedelta(days=365),
+            max_value=datetime.now()
+        )
+
+    with col2:
+        end_date = st.date_input(
+            "End Date",
+            value=datetime.now(),
+            max_value=datetime.now()
+        )
+
+    # Watchlist input
+    st.sidebar.header("Stock Selection")
+    watchlist_input = st.sidebar.text_area(
     "Watchlist (comma-separated)",
     value="AAPL,MSFT,GOOGL,TSLA,AMZN",
     help="Enter stock symbols separated by commas"
 )
 
-# Sort options
-sort_by = st.sidebar.selectbox(
+    # Sort options
+    sort_by = st.sidebar.selectbox(
     "Sort Results By",
     ["Average Return", "Win Rate", "Number of Trades"],
     help="How to sort the results table"
 )
 
-# Run strategy button - make it more prominent
-st.sidebar.markdown("---")
-st.sidebar.markdown("### Ready to Test?")
-run_strategy = st.sidebar.button("🚀 Run Strategy", type="primary", use_container_width=True)
+    # Run strategy button - make it more prominent
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### Ready to Test?")
+    run_strategy = st.sidebar.button("🚀 Run Strategy", type="primary", use_container_width=True)
 
-# Main content area
-if run_strategy:
+    # Main content area
+    if run_strategy:
     if start_date >= end_date:
         st.error("Start date must be before end date!")
     else:
@@ -215,8 +233,8 @@ if run_strategy:
             else:
                 st.error("❌ No successful backtests. Please check your ticker symbols and date range.")
 
-# Display results if available
-if st.session_state.results_data is not None:
+    # Display results if available
+    if st.session_state.results_data is not None:
     st.header("📊 Backtest Results")
     
     # Sort results
@@ -402,11 +420,11 @@ if st.session_state.results_data is not None:
                     hide_index=True
                 )
 
-# Database History Section
-st.markdown("---")
-st.header("📚 Backtest History")
+    # Database History Section
+    st.markdown("---")
+    st.header("📚 Backtest History")
 
-try:
+    try:
     history_df = get_backtest_history(limit=10)
     if not history_df.empty:
         st.subheader("Recent Backtests")
@@ -417,12 +435,12 @@ try:
         )
     else:
         st.info("No backtest history available yet. Run your first strategy above!")
-except Exception as e:
+    except Exception as e:
     st.info("Database history not available - results will be saved locally only.")
 
-# Footer
-st.markdown("---")
-st.markdown("""
+    # Footer
+    st.markdown("---")
+    st.markdown("""
 **Strategy Summary:** Buy after {red_days} consecutive red days when RSI < {rsi_threshold}, 
 sell at ±{exit_percentage}% gain/loss.
 """.format(
