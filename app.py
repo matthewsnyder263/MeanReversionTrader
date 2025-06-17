@@ -41,6 +41,147 @@ if 'exit_percentage' not in st.session_state:
 if 'red_days' not in st.session_state:
     st.session_state.red_days = 2
 
+def render_live_signals_page():
+    """Render the live signals monitoring page"""
+    st.title("🚨 Live Trading Signals")
+    st.markdown("""
+    Monitor real-time trading signals based on your mean reversion strategy. 
+    Configure notifications to get alerts when signals are detected.
+    """)
+    
+    # Render notification settings in sidebar
+    notification_settings = render_notification_settings()
+    
+    # Strategy parameters for live monitoring
+    st.sidebar.header("Strategy Parameters")
+    
+    live_rsi_threshold = st.sidebar.slider(
+        "RSI Threshold", 
+        min_value=10, 
+        max_value=50, 
+        value=st.session_state.rsi_threshold, 
+        help="Buy when RSI is below this value"
+    )
+    
+    live_exit_percentage = st.sidebar.slider(
+        "Exit Gain/Loss %", 
+        min_value=1.0, 
+        max_value=10.0, 
+        value=st.session_state.exit_percentage, 
+        step=0.5,
+        help="Sell when stock moves +/- this percentage from buy price"
+    )
+    
+    live_red_days = st.sidebar.slider(
+        "Red Days Before Buy", 
+        min_value=1, 
+        max_value=5, 
+        value=st.session_state.red_days,
+        help="Number of consecutive red days before triggering a buy signal"
+    )
+    
+    # Main content area
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        st.header("Current Signals")
+        
+        # Check for signals button
+        if st.button("🔍 Check for Signals Now", type="primary"):
+            if notification_settings['watchlist']:
+                strategy_params = {
+                    'rsi_threshold': live_rsi_threshold,
+                    'exit_percentage': live_exit_percentage / 100,
+                    'red_days': live_red_days
+                }
+                
+                with st.spinner("Checking for signals..."):
+                    signals = check_live_signals(
+                        notification_settings['watchlist'], 
+                        strategy_params, 
+                        notification_settings
+                    )
+                
+                if signals:
+                    st.success(f"Found {len(signals)} signal(s)!")
+                    
+                    # Display signals
+                    for signal in signals:
+                        with st.expander(f"📈 {signal['ticker']} - {signal['signal_type']} Signal"):
+                            col_a, col_b, col_c = st.columns(3)
+                            
+                            with col_a:
+                                st.metric("Price", f"${signal['price']:.2f}")
+                            
+                            with col_b:
+                                st.metric("RSI", f"{signal['rsi']:.1f}")
+                            
+                            with col_c:
+                                st.metric("Red Days", signal['red_days'])
+                            
+                            st.write(f"**Timestamp:** {signal['timestamp'].strftime('%Y-%m-%d %H:%M:%S')}")
+                            
+                            # Show formatted message
+                            message = format_trading_signal(
+                                signal['ticker'], signal['signal_type'], signal['price'],
+                                signal['rsi'], signal['red_days'], strategy_params
+                            )
+                            st.text_area("Signal Message", message, height=200)
+                else:
+                    st.info("No signals found at this time.")
+            else:
+                st.warning("Please add tickers to your watchlist in the sidebar.")
+        
+        # Auto-refresh option
+        st.markdown("---")
+        auto_refresh = st.checkbox("🔄 Auto-refresh signals", help="Automatically check for new signals")
+        
+        if auto_refresh and notification_settings['watchlist']:
+            # Use streamlit's rerun for auto-refresh
+            time.sleep(60)  # Wait 1 minute
+            st.rerun()
+    
+    with col2:
+        st.header("Signal History")
+        
+        # Show recent signals from database if available
+        try:
+            from database import get_backtest_history
+            recent_runs = get_backtest_history(limit=5)
+            
+            if not recent_runs.empty:
+                st.subheader("Recent Backtests")
+                for _, run in recent_runs.iterrows():
+                    with st.container():
+                        st.write(f"**{run['run_date'].strftime('%m/%d %H:%M')}**")
+                        st.write(f"Avg Return: {run['avg_return']:.2f}%")
+                        st.write(f"Win Rate: {run['avg_win_rate']:.1f}%")
+                        st.write("---")
+            else:
+                st.info("No backtest history available.")
+        except Exception as e:
+            st.info("Signal history unavailable.")
+        
+        # Configuration status
+        st.subheader("Notification Status")
+        
+        if notification_settings['sms_enabled']:
+            st.success("✅ SMS notifications enabled")
+        else:
+            st.info("📱 SMS notifications disabled")
+        
+        if notification_settings['email_enabled']:
+            st.success("✅ Email notifications enabled")
+        else:
+            st.info("📧 Email notifications disabled")
+        
+        if notification_settings['watchlist']:
+            st.write(f"**Monitoring:** {len(notification_settings['watchlist'])} tickers")
+            for ticker in notification_settings['watchlist']:
+                st.write(f"• {ticker}")
+        else:
+            st.warning("⚠️ No tickers in watchlist")
+
 # Navigation
 page = st.sidebar.radio("Navigation", ["🏠 Backtester", "🎮 Strategy Playground", "🚨 Live Signals"], index=0)
 
