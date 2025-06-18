@@ -52,7 +52,7 @@ your-repo/
 ├── .gitignore             # Git ignore rules
 ├── .env.example           # Environment template
 ├── dependencies.md        # Package list
-└── SETUP.md              # This file
+├── SETUP.md              # This file
 ```
 
 ## Running on Different Platforms
@@ -77,7 +77,7 @@ EXPOSE 5000
 CMD ["streamlit", "run", "app.py", "--server.port=5000"]
 ```
 
-## Troubleshooting
+### Troubleshooting
 
 ### Common Issues
 - **Database connection**: Ensure PostgreSQL is running and DATABASE_URL is correct
