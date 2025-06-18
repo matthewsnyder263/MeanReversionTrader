@@ -1,3 +1,5 @@
+*Originally prototyped in Replit for rapid iteration. Currently being cleaned, extended, and prepared for deployment using Docker + conventional architecture.*
+
 # Mean Reversion Trading Strategy Backtester
 
 A Streamlit application for backtesting mean reversion trading strategies with real-time signal monitoring and notification capabilities.
